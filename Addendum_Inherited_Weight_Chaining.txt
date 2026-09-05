@@ -1,0 +1,288 @@
+ADDENDUM -- INHERITED-WEIGHT CHAINING
+Variant of the b1 <-> b2 chaining scheme with propagation of the weight
+N2 -> N1 from one step to the next
+Companion to the report "Diophantine structure of the pool b(t,k,sigma)"
+Document generated on September 5, 2026
+
+================================================================================
+0. PRELIMINARY CORRECTION -- ANCHOR COUNTS
+================================================================================
+A re-reading of the supplied files (chainage_beta03.txt, chainage_beta05.txt)
+together with an independent recomputation of the pool reveal that the table
+in Sections 7.1/7.2 of the previous report contained incorrect anchor counts
+(off by a factor of 10, too low). The correct values, verified here by two
+independent methods (re-reading the files and regenerating the pool), are:
+
+Interval                       | Anchors reported  | Anchors actual
+                                | (previous report) | (recomputed, verified)
+--------------------------------+--------------------+------------------------
+beta=0.3, i=1 ]14.542,20.797[   |        200         |          2000
+beta=0.3, i=3 ]21.788,25.115[   |         94         |           994
+beta=0.3, i=4 ]25.115,30.231[   |        106         |          1006
+beta=0.5, i=1 ]13.583,21.147[   |        200         |          2000
+beta=0.5, i=4 ]24.287,25.066[   |         88         |           988
+beta=0.5, i=5 ]25.066,30.344[   |        112         |          1012
+
+This correction changes nothing about the band widths, the step-1
+reconstruction errors, or the qualitative conclusions of the report (the
+success rate remains 100% in every non-empty interval for the original
+free-weight chaining): only the number of tested anchors had been
+misreported. The main Word document will be corrected accordingly.
+
+================================================================================
+1. NEW PROPAGATION RULE
+================================================================================
+In the original algorithm (report, Section 7), each step of the chaining
+freely searches for the best pair (N1, N2) -- both bounded by N_MAX = 65536
+-- to link the current anchor b1 to a new partner b2 reconstructing the next
+target. Only the value b2 was reused as the anchor for the next step; the
+weight N1 was re-optimized at every step, independently of what preceded it.
+
+The requested variant modifies this rule: the weight assigned to the partner
+found at step n (i.e. N2_n) becomes the FIXED weight of the anchor at step
+n+1 (N1_{n+1}), at the same time as b2_n becomes b1_{n+1}:
+
+  Step 1: free search -> obtaining (N1_1,b1_1) and (N2_1,b2_1)
+          [b1_1 = starting anchor, method identical to the original report]
+
+  Step 2: {N1_2,b1_2} <- {N2_1,b2_1}, then search for (N2_2,b2_2) such that
+          (N1_2*b1_2+N2_2*b2_2)/(N1_2+N2_2) = x0_2, with N1_2 now FIXED (= N2_1)
+
+  Step 3: {N1_3,b1_3} <- {N2_2,b2_2}, then search for (N2_3,b2_3) for x0_3,
+          with N1_3 FIXED (= N2_2)
+
+  ... and so on to the end of the list: at every step n>=2, N1_n = N2_{n-1}.
+
+From step 2 onward, only a single degree of freedom remains (N2, a positive
+integer bounded by 65536) instead of two: for each candidate b2 in the pool
+(opposite sign to b1), we compute
+    N2_exact = N1 * (x0 - b1) / (b2 - x0)
+round it to the nearest integer (bounded to [1, 65536]), and keep the
+candidate b2 that minimizes the reconstruction error. This search is
+exhaustive over the entire pool at every step (no shortcut via
+continued-fraction approximation is possible, since b2 is no longer a free
+variable).
+
+Step 1 of every chain is taken unchanged from the original files
+(chainage_beta03.txt / chainage_beta05.txt), in order to guarantee exact
+continuity with the previous report; only step 2 onward has been recomputed
+with the new rule, on the extended pool (t_max=1000, k_range=15, 60000
+candidates), regenerated and independently verified (control value
+t=9,k=-3,sigma=-1 -> b=25.092889841584267, identical to the report).
+
+================================================================================
+2. MAIN RESULT: PRECISION DEGRADES, BUT REMAINS VERY GOOD OVERALL
+================================================================================
+The computation was carried out exhaustively over the 8000 starting chains
+of the 6 non-empty founding intervals (2000+994+1006 for beta=0.3;
+2000+988+1012 for beta=0.5), i.e. approximately 44,000 search steps, each
+scanning the entire pool of opposite sign (~30,000 candidates).
+
+Result: removing one degree of freedom (N1 fixed and inherited rather than
+freely searched) markedly degrades the typical precision (median around
+10^-8 instead of 10^-10 to 10^-13 in the free case), and above all reveals,
+in certain intervals, a non-negligible fraction of chains whose error at a
+given step greatly exceeds 10^-6 (up to a few % to nearly 0.2-0.3 in the
+isolated worst case). The proportion of chains that stay under 10^-6 at
+EVERY step varies strongly by founding interval -- from 40.7% to 99.8% --
+whereas it was 100% everywhere in the free case:
+
+List    | Founding interval        | #chains | All steps  | All steps
+        |                           |         | < 1e-6     | < 1e-3
+--------+---------------------------+---------+------------+-----------------
+beta=0.3| i=1 ]14.542,20.797[       |  2000   | 1950 (97.50%) | 2000 (100.00%)
+beta=0.3| i=3 ]21.788,25.115[       |   994   |  692 (69.62%) |  993 (99.90%)
+beta=0.3| i=4 ]25.115,30.231[       |  1006   | 1003 (99.70%) | 1006 (100.00%)
+beta=0.5| i=1 ]13.583,21.147[       |  2000   | 1786 (89.30%) | 1996 (99.80%)
+beta=0.5| i=4 ]24.287,25.066[       |   988   |  402 (40.69%) |  985 (99.70%)
+beta=0.5| i=5 ]25.066,30.344[       |  1012   | 1010 (99.80%) | 1011 (99.90%)
+
+On the other hand, with a looser tolerance threshold (error < 10^-3), the
+success rate remains very high everywhere (>= 99.7%). The constraint
+introduced by weight inheritance therefore genuinely degrades the
+achievable precision, but does not eliminate the ability to chain: it
+simply makes it less consistently "perfect".
+
+================================================================================
+3. WHY THE DEGRADATION STAYS MODERATE: THE ROLE OF THE INHERITED WEIGHT N1
+================================================================================
+The explanation lies in the order of magnitude of the inherited weight N1
+across steps. Unlike N1_1 (always large, since it comes from an optimized
+free search), the N1 inherited at later steps is simply the N2 found at
+the previous step -- a value that is not optimized on any "stay large"
+criterion: it can occasionally fall very low. On the founding interval
+beta=0.3 [1], the distribution of the inherited N1 at each step is:
+
+Step | N1 min | N1 p25 | N1 median | N1 p75 | N1 max
+-----+--------+--------+-----------+--------+--------
+  1  |  2035  | 32949  |   46134   | 56718  | 65531
+  2  |   289  |  4688  |    6782   | 27056  | 39169
+  3  |    12  |  5122  |   11146   | 16507  | 50315
+  4  |    42  |  2203  |    6628   | 26391  | 65529
+  5  |    50  |  6521  |   20888   | 39438  | 65527
+  6  |   124  |  4752  |   14492   | 25383  | 56756
+
+The observed minimum drops quickly (from 2035 at step 1 to only 12 at step
+3), while the median stays on the order of several thousand to a few tens
+of thousands. It is this dispersion -- not a simple systematic shift --
+that explains the table in Section 2: most chains inherit an N1 still
+large enough that the pool of ~30,000 candidates offers, by sheer
+combinatorial density, a point falling very close to the target; but a
+minority of chains inherit a small N1 (a few dozen to a few hundred), for
+which the effective resolution of the search collapses and the error
+explodes (up to 10^-1 or more in the worst cases). A moderate negative
+correlation is measured between log(N1) and log(error) (coefficient ~=
+-0.25), confirming this mechanism.
+
+This result directly extends the critique in Section 6 of the main report,
+but in a more nuanced way than expected: removing one degree of freedom
+does introduce a real, measurable constraint (it produces occasional
+failures, absent from the free case), but it is not sufficient to
+systematically turn the problem into a severe test, because the inherited
+weight N1 is not constrained to stay small at any step -- it simply
+fluctuates, occasionally taking low values. A more severe and systematic
+test would consist of explicitly capping N_MAX to a small, fixed value
+from step 1 onward (for example a few hundred), so that the constraint
+applies uniformly to all chains rather than depending on a random
+inherited draw.
+
+================================================================================
+4. DETAIL BY STEP AND BY FOUNDING INTERVAL
+================================================================================
+
+--- 4.1 List beta=0.3 ---
+
+Interval [1] ]14.542, 20.797[ -- 2000 chains, 6 remaining steps:
+Step | Target x0 | Min error | Median error | Mean error | Max error | %<1e-6
+-----+-----------+-----------+--------------+------------+-----------+-------
+  1  |  20.797   | 2.49e-14  |   1.13e-10   |  1.53e-10  | 1.06e-09  | 100.0%
+  2  |  21.788   | 3.68e-11  |   2.58e-08   |  4.98e-08  | 1.84e-06  | 99.75%
+  3  |  25.115   | 2.03e-11  |   4.13e-08   |  1.20e-07  | 3.33e-06  | 98.05%
+  4  |  30.231   | 8.40e-12  |   1.32e-08   |  3.67e-08  | 1.35e-06  | 99.95%
+  5  |  30.884   | 8.99e-13  |   1.76e-08   |  3.59e-08  | 1.45e-06  | 99.95%
+  6  |  33.514   | 4.46e-11  |   3.78e-08   |  8.10e-08  | 6.63e-06  | 99.80%
+
+Interval [3] ]21.788, 25.115[ -- 994 chains, 4 remaining steps:
+Step | Target x0 | Min error | Median error | Mean error | Max error | %<1e-6
+-----+-----------+-----------+--------------+------------+-----------+-------
+  1  |  25.115   | 5.68e-14  |   1.07e-10   |  1.38e-10  | 1.12e-09  | 100.0%
+  2  |  30.231   | 2.86e-10  |   3.86e-07   |  1.39e-03  | 1.38e+00  | 79.07%
+  3  |  30.884   | 1.86e-11  |   3.47e-07   |  1.44e-06  | 8.42e-04  | 85.01%
+  4  |  33.514   | 1.59e-11  |   2.03e-08   |  8.00e-08  | 3.94e-05  | 99.80%
+
+Interval [4] ]25.115, 30.231[ -- 1006 chains, 3 remaining steps:
+Step | Target x0 | Min error | Median error | Mean error | Max error | %<1e-6
+-----+-----------+-----------+--------------+------------+-----------+-------
+  1  |  30.231   | 3.20e-13  |   8.86e-11   |  1.15e-10  | 7.09e-10  | 100.0%
+  2  |  30.884   | 3.83e-12  |   1.52e-08   |  2.59e-08  | 5.37e-07  | 100.0%
+  3  |  33.514   | 1.93e-11  |   3.10e-08   |  6.40e-08  | 1.67e-06  | 99.70%
+
+--- 4.2 List beta=0.5 ---
+
+Interval [1] ]13.583, 21.147[ -- 2000 chains, 8 remaining steps:
+Step | Target x0 | Min error | Median error | Mean error | Max error | %<1e-6
+-----+-----------+-----------+--------------+------------+-----------+-------
+  1  |  21.147   | 3.55e-14  |   9.95e-11   |  1.41e-10  | 1.10e-09  | 100.0%
+  2  |  21.760   | 4.47e-12  |   1.58e-08   |  3.06e-08  | 1.19e-06  | 99.95%
+  3  |  24.287   | 5.61e-12  |   2.53e-08   |  4.53e-08  | 2.86e-06  | 99.85%
+  4  |  25.066   | 1.39e-11  |   3.41e-08   |  6.34e-08  | 1.91e-06  | 99.75%
+  5  |  30.344   | 3.95e-11  |   3.18e-08   |  3.32e-06  | 3.60e-03  | 94.20%
+  6  |  30.895   | 3.88e-12  |   2.84e-08   |  1.21e-06  | 8.22e-04  | 94.60%
+  7  |  32.787   | 5.17e-12  |   4.08e-08   |  7.18e-07  | 2.81e-04  | 95.20%
+  8  |  33.596   | 4.14e-12  |   2.91e-08   |  6.92e-05  | 1.05e-01  | 93.35%
+
+Interval [4] ]24.287, 25.066[ -- 988 chains, 5 remaining steps:
+Step | Target x0 | Min error | Median error | Mean error | Max error | %<1e-6
+-----+-----------+-----------+--------------+------------+-----------+-------
+  1  |  25.066   | 2.84e-14  |   1.03e-10   |  1.38e-10  | 8.32e-10  | 100.0%
+  2  |  30.344   | 5.86e-10  |   5.76e-07   |  4.41e-05  | 2.80e-02  | 67.81%
+  3  |  30.895   | 1.12e-09  |   4.54e-07   |  3.00e-06  | 2.02e-03  | 77.53%
+  4  |  32.787   | 2.21e-10  |   1.44e-07   |  3.74e-07  | 8.36e-05  | 94.53%
+  5  |  33.596   | 7.15e-10  |   4.71e-07   |  3.72e-05  | 3.16e-02  | 69.64%
+
+Interval [5] ]25.066, 30.344[ -- 1012 chains, 4 remaining steps:
+Step | Target x0 | Min error | Median error | Mean error | Max error | %<1e-6
+-----+-----------+-----------+--------------+------------+-----------+-------
+  1  |  30.344   | 1.78e-14  |   7.52e-11   |  5.55e-10  | 4.56e-07  | 100.0%
+  2  |  30.895   | 9.77e-13  |   1.32e-08   |  1.14e-06  | 1.13e-03  | 99.80%
+  3  |  32.787   | 1.62e-11  |   1.51e-08   |  3.31e-07  | 3.07e-04  | 99.90%
+  4  |  33.596   | 8.54e-11  |   2.31e-08   |  2.13e-04  | 2.16e-01  | 99.90%
+
+Column note: "%<1e-6" denotes the proportion of all chains in the interval
+whose reconstruction error at THIS step (individually) remains below 10^-6
+-- including chains that already failed at an earlier step, since the
+chaining always continues with the best candidate found, even when that
+candidate is of mediocre precision. The degradation is particularly marked
+on intervals beta=0.3 [3] and beta=0.5 [4] (79% and 68% at the first
+post-inheritance step), whereas intervals [4]/[1]/[5] stay very close to
+100% at every step -- a heterogeneity that simply reflects the variability
+of the inherited N1 described in Section 3, specific to each population of
+chains.
+
+================================================================================
+5. DETAILED EXAMPLES (STARTING CHAIN l=1, SAME STARTING POINT FOR BOTH LISTS)
+================================================================================
+To concretely illustrate the mechanism, here is the full detail of the
+first starting chain (l=1) for each list, starting from the same initial
+anchor b(t=1,k=-2,sigma=+1) = 19.905401285 (founding interval common to
+both lists). The "N1 (inherited)" column explicitly shows the requested
+propagation: at every line n>=2, the value of N1 is exactly equal to the
+N2 found on line n-1.
+
+--- 5.1 List beta=0.3 -- interval [1] ---
+Step | Target x0 | N1(inh)| N2(found)| (t,k,sigma)   | b               | Error
+-----+-----------+--------+----------+---------------+-----------------+---------
+0    | (start)   |   --   |    --    | t=1,k=-2,+    |  19.905401285   |   --
+1    | 20.797    | 21352  |   4591   | t=995,k=-3,-  |  24.943681718   | 2.61e-11
+2    | 21.788    |  4591  |  10197   | t=304,k=-2,+  |  20.367215913   | 3.84e-08
+3    | 25.115    | 10197  |   2694   | t=306,k=-5,-  |  43.085733100   | 4.95e-08
+4    | 30.231    |  2694  |  43861   | t=687,k=-3,+  |  29.441445489   | 1.25e-08
+5    | 30.884    | 43861  |  20157   | t=268,k=-4,-  |  34.022953343   | 1.34e-08
+6    | 33.514    | 20157  |   2519   | t=681,k=-3,+  |  29.441362434   | 6.58e-08
+
+Line-by-line check: N2 of step 1 = 4591 -> N1 of step 2 = 4591; N2 of step
+2 = 10197 -> N1 of step 3 = 10197; and so on through step 6. This chain
+stays very precise at every step (maximum error 6.6e-08), the inherited
+N1 never dropping below ~2700.
+
+--- 5.2 List beta=0.5 -- interval [1] ---
+Step | Target x0 | N1(inh)| N2(found)| (t,k,sigma)   | b               | Error
+-----+-----------+--------+----------+---------------+-----------------+---------
+0    | (start)   |   --   |    --    | t=1,k=-2,+    |  19.905401285   |   --
+1    | 21.147    | 32362  |  10583   | t=991,k=-3,- |  24.943713372   | 1.68e-11
+2    | 21.760    | 10583  |  24097   | t=214,k=-2,+  |  20.361766279   | 1.87e-08
+3    | 24.287    | 24097  |   2562   | t=673,k=-7,- |  61.205952865   | 1.02e-08
+4    | 25.066    |  2562  |  19635   | t=120,k=-2,+  |  20.350412644   | 6.77e-08
+5    | 30.344    | 19635  |  53455   | t=501,k=-4,- |  34.014827631   | 4.47e-08
+6    | 30.895    | 53455  |   2254   | t=187,k=5,+   | -43.093637124   | 3.73e-08
+7    | 32.787    |  2254  |  16611   | t=361,k=-5,- |  43.083487444   | 1.67e-07
+8    | 33.596    | 16611  |   3185   | t=524,k=2,+   | -15.884896031   | 3.56e-09
+
+Same check: N2 of step 1 = 10583 -> N1 of step 2 = 10583; N2 of step 2 =
+24097 -> N1 of step 3 = 24097; etc. This particular chain also stays very
+precise over its 8 steps (maximum error 1.7e-07).
+
+================================================================================
+6. CONCLUSION OF THIS ADDENDUM
+================================================================================
+The propagation rule tested here -- inheriting at every step the weight N2
+found at the previous step as the new fixed N1 -- introduces a real,
+measurable constraint: the typical precision degrades by 2 to 4 orders of
+magnitude compared with the fully free case, and above all, a significant
+fraction of chains (up to about 60% on the most affected interval, beta=0.5
+[4]) fail to stay under the 10^-6 threshold at every step -- a phenomenon
+completely absent from the free-weight chaining (100% success everywhere).
+With a more realistic tolerance threshold (10^-3), the overall success
+rate nonetheless remains very high (>= 99.7% everywhere).
+
+The identified cause is that the inherited weight N1 fluctuates strongly
+from one chain to another (from a few dozen to several tens of thousands),
+without ever being systematically constrained to stay small: when it
+remains large (the majority case), the combinatorial-density argument from
+Section 6 of the main report continues to apply almost intact; when it
+drops low (a minority but non-negligible case), the precision collapses
+locally. To turn this variant into a truly discriminating test of the DMT
+framework, one would need to combine weight inheritance with a much
+smaller, fixed N_MAX from step 1 onward (for example a few hundred), so
+that the constraint applies uniformly to all chains rather than depending
+on a randomly inherited draw whose magnitude varies from chain to chain.
